@@ -1,12 +1,23 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
+
+type IsEvenResponse struct {
+	RequestedAt int64
+	IsEven      string
+}
+
+type IsEvenRequest struct {
+	RequesterId string
+	Integer     int
+	CreatedAt   int64
+}
 
 var (
 	topicForRequest = "is-even-request"
@@ -42,21 +53,37 @@ func startServer() {
 		if err != nil {
 			continue
 		}
-		handleMessage(responseProducer, string(message.Value))
+		handleMessage(responseProducer, message)
 	}
 }
 
-func handleMessage(responseProducer *kafka.Producer, message string) error {
-	integer, err := strconv.Atoi(message)
-	fmt.Printf("Consumed message from topic is-even-request: value = %d\n", integer)
+func handleMessage(responseProducer *kafka.Producer, message *kafka.Message) error {
+	isEvenRequest := IsEvenRequest{}
+	err := json.Unmarshal(message.Value, &isEvenRequest)
+	fmt.Printf("Consumed message from topic is-even-request: value = %d\n", isEvenRequest.Integer)
 	if err != nil {
 		return err
 	}
-	responseProducer.Produce(&kafka.Message{
-		TopicPartition: kafka.TopicPartition{Topic: &topicForReply, Partition: kafka.PartitionAny},
-		Value:          []byte(isEven(integer)),
+	encodedResponse, err := buildIsEvenResponse(&isEvenRequest)
+	if err != nil {
+		return err
+	}
+	err = responseProducer.Produce(&kafka.Message{
+		Key:            []byte(isEvenRequest.RequesterId),
+		TopicPartition: kafka.TopicPartition{Topic: &topicForReply},
+		Value:          encodedResponse,
 	}, nil)
+	if err != nil {
+		return err
+	}
 	return nil
+}
+
+func buildIsEvenResponse(isEvenRequest *IsEvenRequest) ([]byte, error) {
+	return json.Marshal(IsEvenResponse{
+		RequestedAt: isEvenRequest.CreatedAt,
+		IsEven:      isEven(isEvenRequest.Integer),
+	})
 }
 
 func isEven(integer int) string {

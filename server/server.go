@@ -60,10 +60,10 @@ func startServer() {
 func handleMessage(responseProducer *kafka.Producer, message *kafka.Message) error {
 	isEvenRequest := IsEvenRequest{}
 	err := json.Unmarshal(message.Value, &isEvenRequest)
-	fmt.Printf("Consumed message from topic is-even-request: value = %d\n", isEvenRequest.Integer)
 	if err != nil {
 		return err
 	}
+	fmt.Printf("Consumed message from topic is-even-request: value = %d\n", isEvenRequest.Integer)
 	encodedResponse, err := buildIsEvenResponse(&isEvenRequest)
 	if err != nil {
 		return err

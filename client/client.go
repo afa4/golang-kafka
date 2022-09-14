@@ -29,6 +29,7 @@ func main() {
 	if err != nil {
 		panic("Fatal error")
 	}
+
 	for e := repliesDurations.Front(); e != nil; e = e.Next() {
 		fmt.Println(e.Value)
 	}
@@ -48,13 +49,11 @@ func startClient(numberOfRequests int) (*list.List, error) {
 	}
 	defer repliesConsumer.Close()
 
-	fmt.Printf("Client %s started...\n", clientId)
 	repliesConsumer.SubscribeTopics([]string{topicForReply}, nil)
 	responsesDurations := list.New()
 	for {
 		message, err := repliesConsumer.ReadMessage(time.Second * 5)
 		if err != nil {
-			fmt.Println(err.Error())
 			break
 		}
 		messageKey := string(message.Key)

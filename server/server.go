@@ -25,10 +25,9 @@ func main() {
 	for {
 		message, err := c.ReadMessage(-1) // indefinite wait
 		if err != nil {
-			// Errors are informational and automatically handled by the consumer
 			continue
 		}
-		fmt.Printf("Consumed event from topic %s: key = %-10s value = %s\n",
-			*message.TopicPartition.Topic, string(message.Key), string(message.Value))
+		fmt.Printf("Consumed message from topic %s: value = %s\n",
+			*message.TopicPartition.Topic, string(message.Value))
 	}
 }

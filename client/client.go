@@ -52,7 +52,7 @@ func startClient(numberOfRequests int) (*list.List, error) {
 	repliesConsumer.SubscribeTopics([]string{topicForReply}, nil)
 	responsesDurations := list.New()
 	for {
-		message, err := repliesConsumer.ReadMessage(time.Second * 5)
+		message, err := repliesConsumer.ReadMessage(time.Second * 3)
 		if err != nil {
 			break
 		}

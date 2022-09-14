@@ -1,20 +1,20 @@
 # golang-kafka
 
-## Requirements
+### Requirements
 
-- [Install and run kafka server](https://kafka.apache.org/quickstart)
+[Install and run kafka server](https://kafka.apache.org/quickstart)
 
-- Create  `is-even-request` and `is-event-reply` topics
+Create is-even-request and is-event-reply topics
 
-```
+```shell
 bin/kafka-topics.sh --create --topic is-even-request --bootstrap-server localhost:9092
 ```
 
-```
+```shell
 bin/kafka-topics.sh --create --topic is-even-reply --bootstrap-server localhost:9092
 ```
 
-## Kafka util scripts
+### Kafka util scripts
 
 list topics
 

@@ -8,6 +8,11 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
+var (
+	topicForRequest = "is-even-request"
+	topicForReply   = "is-even-reply"
+)
+
 func main() {
 	startServer()
 }
@@ -17,48 +22,47 @@ func startServer() {
 		"bootstrap.servers": "localhost",
 		"group.id":          "server",
 	})
-	defer consumer.Close()
-
 	if err != nil {
 		fmt.Printf("Failed to create consumer: %s", err)
 		os.Exit(1)
 	}
+	defer consumer.Close()
 
 	fmt.Println("Waiting for messages...")
 
-	isEvenProducer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "localhost"})
+	responseProducer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "localhost"})
 	if err != nil {
 		panic(err)
 	}
+	defer responseProducer.Close()
 
-	defer isEvenProducer.Close()
-
-	consumer.SubscribeTopics([]string{"is-even-request"}, nil)
+	consumer.SubscribeTopics([]string{topicForRequest}, nil)
 	for {
 		message, err := consumer.ReadMessage(-1) // indefinite wait
 		if err != nil {
 			continue
 		}
-		isEvenMessage(isEvenProducer, string(message.Value))
+		handleMessage(responseProducer, string(message.Value))
 	}
 }
 
-func isEvenMessage(producer *kafka.Producer, message string) error {
+func handleMessage(responseProducer *kafka.Producer, message string) error {
 	integer, err := strconv.Atoi(message)
 	fmt.Printf("Consumed message from topic is-even-request: value = %d\n", integer)
 	if err != nil {
 		return err
 	}
-	var response string
-	if integer%2 == 0 {
-		response = "yes"
-	} else {
-		response = "no"
-	}
-	responseTopic := "is-even-reply"
-	producer.Produce(&kafka.Message{
-		TopicPartition: kafka.TopicPartition{Topic: &responseTopic, Partition: kafka.PartitionAny},
-		Value:          []byte(response),
+	responseProducer.Produce(&kafka.Message{
+		TopicPartition: kafka.TopicPartition{Topic: &topicForReply, Partition: kafka.PartitionAny},
+		Value:          []byte(isEven(integer)),
 	}, nil)
 	return nil
+}
+
+func isEven(integer int) string {
+	if integer%2 == 0 {
+		return "yes"
+	} else {
+		return "no"
+	}
 }

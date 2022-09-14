@@ -23,9 +23,11 @@ var (
 )
 
 func startClient() {
+	go requestSeveralIsEven()
 	repliesConsumer, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost",
-		"group.id":          "client",
+		"group.id":          clientId,
+		"auto.offset.reset": "earliest",
 	})
 	if err != nil {
 		fmt.Printf("Failed to create consumer: %s", err)
@@ -35,19 +37,21 @@ func startClient() {
 
 	fmt.Printf("Client %s started...\n", clientId)
 	repliesConsumer.SubscribeTopics([]string{topicForReply}, nil)
-	go requestSeveralIsEven()
+	counter := 0
 	for {
-		message, err := repliesConsumer.ReadMessage(-1) // indefinite wait {"RequesterId":"4bfad623-b465-427c-88ff-e287ff242cf3", "Integer":2, "CreatedAt":1}
+		message, err := repliesConsumer.ReadMessage(time.Second * 5)
 		if err != nil {
-			continue
+			fmt.Println(err.Error())
+			break
 		}
 		messageKey := string(message.Key)
 		if messageKey != clientId {
-			fmt.Printf("[NOT PROCESS] Message on %s: key=%s value=%s\n", message.TopicPartition.String(), string(message.Key), string(message.Value))
 			continue
 		}
-		fmt.Printf("[PROCESS] Message on %s: key=%s value=%s\n", message.TopicPartition.String(), string(message.Key), string(message.Value))
+		handleReplyMessages(message)
+		counter++
 	}
+	fmt.Printf("[PROCESSED MESSAGES] %d\n", counter)
 }
 
 func requestSeveralIsEven() error {
@@ -59,7 +63,8 @@ func requestSeveralIsEven() error {
 	for i := 0; i < 100; i++ {
 		encodedRequest, err := buildRandomIsEvenRequest()
 		if err != nil {
-			return err
+			continue
+			//panic(err)
 		}
 		err = requestProducer.Produce(&kafka.Message{
 			Key:            []byte(clientId),
@@ -67,7 +72,8 @@ func requestSeveralIsEven() error {
 			Value:          encodedRequest,
 		}, nil)
 		if err != nil {
-			return err
+			continue
+			//panic(err)
 		}
 	}
 	return nil
@@ -81,4 +87,14 @@ func buildRandomIsEvenRequest() ([]byte, error) {
 			CreatedAt:   time.Now().UnixNano(),
 		},
 	)
+}
+
+func handleReplyMessages(message *kafka.Message) error {
+	reply := types.IsEvenResponse{}
+	err := json.Unmarshal(message.Value, &reply)
+	if err != nil {
+		return err
+	}
+	fmt.Println(reply.RequestedAt - time.Now().UnixNano())
+	return nil
 }

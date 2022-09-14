@@ -53,7 +53,7 @@ func handleMessage(responseProducer *kafka.Producer, message *kafka.Message) err
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Consumed message from topic is-even-request: value = %d\n", isEvenRequest.Integer)
+	fmt.Printf("%s is-even-request for integer = %d\n", message.Key, isEvenRequest.Integer)
 	encodedResponse, err := buildIsEvenResponse(&isEvenRequest)
 	if err != nil {
 		return err

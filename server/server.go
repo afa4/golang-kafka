@@ -5,19 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/afa4/golang-kafka/types"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
-
-type IsEvenResponse struct {
-	RequestedAt int64
-	IsEven      string
-}
-
-type IsEvenRequest struct {
-	RequesterId string
-	Integer     int
-	CreatedAt   int64
-}
 
 var (
 	topicForRequest = "is-even-request"
@@ -58,7 +48,7 @@ func startServer() {
 }
 
 func handleMessage(responseProducer *kafka.Producer, message *kafka.Message) error {
-	isEvenRequest := IsEvenRequest{}
+	isEvenRequest := types.IsEvenRequest{}
 	err := json.Unmarshal(message.Value, &isEvenRequest)
 	if err != nil {
 		return err
@@ -79,14 +69,14 @@ func handleMessage(responseProducer *kafka.Producer, message *kafka.Message) err
 	return nil
 }
 
-func buildIsEvenResponse(isEvenRequest *IsEvenRequest) ([]byte, error) {
-	return json.Marshal(IsEvenResponse{
+func buildIsEvenResponse(isEvenRequest *types.IsEvenRequest) ([]byte, error) {
+	return json.Marshal(types.IsEvenResponse{
 		RequestedAt: isEvenRequest.CreatedAt,
 		IsEven:      isEven(isEvenRequest.Integer),
 	})
 }
 
-func isEven(integer int) string {
+func isEven(integer int32) string {
 	if integer%2 == 0 {
 		return "yes"
 	} else {

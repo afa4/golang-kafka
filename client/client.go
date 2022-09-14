@@ -1,10 +1,12 @@
 package main
 
 import (
+	"container/list"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/afa4/golang-kafka/types"
@@ -12,18 +14,29 @@ import (
 	"github.com/google/uuid"
 )
 
-func main() {
-	startClient()
-}
-
 var (
 	topicForRequest = "is-even-request"
 	topicForReply   = "is-even-reply"
 	clientId        = uuid.New().String()
 )
 
-func startClient() {
-	go requestSeveralIsEven()
+func main() {
+	numberOfRequests, err := strconv.Atoi(os.Args[1])
+	if err != nil {
+		panic("Fatal error")
+	}
+	repliesDurations, err := startClient(numberOfRequests)
+	if err != nil {
+		panic("Fatal error")
+	}
+	for e := repliesDurations.Front(); e != nil; e = e.Next() {
+		fmt.Println(e.Value)
+	}
+}
+
+func startClient(numberOfRequests int) (*list.List, error) {
+	go requestIsEven(numberOfRequests)
+
 	repliesConsumer, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost",
 		"group.id":          clientId,
@@ -31,13 +44,13 @@ func startClient() {
 	})
 	if err != nil {
 		fmt.Printf("Failed to create consumer: %s", err)
-		os.Exit(1)
+		return nil, err
 	}
 	defer repliesConsumer.Close()
 
 	fmt.Printf("Client %s started...\n", clientId)
 	repliesConsumer.SubscribeTopics([]string{topicForReply}, nil)
-	counter := 0
+	responsesDurations := list.New()
 	for {
 		message, err := repliesConsumer.ReadMessage(time.Second * 5)
 		if err != nil {
@@ -48,23 +61,26 @@ func startClient() {
 		if messageKey != clientId {
 			continue
 		}
-		handleReplyMessages(message)
-		counter++
+		duration, err := handleReplyMessages(message)
+		if err != nil {
+			fmt.Println("Handle Message error")
+			continue
+		}
+		responsesDurations.PushBack(duration)
 	}
-	fmt.Printf("[PROCESSED MESSAGES] %d\n", counter)
+	return responsesDurations, err
 }
 
-func requestSeveralIsEven() error {
+func requestIsEven(numberOfTimes int) error {
 	requestProducer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "localhost"})
 	if err != nil {
 		panic(err)
 	}
 	defer requestProducer.Close()
-	for i := 0; i < 100; i++ {
+	for i := 0; i < numberOfTimes; i++ {
 		encodedRequest, err := buildRandomIsEvenRequest()
 		if err != nil {
-			continue
-			//panic(err)
+			panic(err)
 		}
 		err = requestProducer.Produce(&kafka.Message{
 			Key:            []byte(clientId),
@@ -72,8 +88,7 @@ func requestSeveralIsEven() error {
 			Value:          encodedRequest,
 		}, nil)
 		if err != nil {
-			continue
-			//panic(err)
+			panic(err)
 		}
 	}
 	return nil
@@ -84,17 +99,16 @@ func buildRandomIsEvenRequest() ([]byte, error) {
 		types.IsEvenRequest{
 			RequesterId: clientId,
 			Integer:     rand.Int31(),
-			CreatedAt:   time.Now().UnixNano(),
+			CreatedAt:   time.Now().UnixMilli(),
 		},
 	)
 }
 
-func handleReplyMessages(message *kafka.Message) error {
+func handleReplyMessages(message *kafka.Message) (int64, error) {
 	reply := types.IsEvenResponse{}
 	err := json.Unmarshal(message.Value, &reply)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	fmt.Println(reply.RequestedAt - time.Now().UnixNano())
-	return nil
+	return time.Now().UnixMilli() - reply.RequestedAt, err
 }
